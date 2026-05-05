@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>就业岗位查询</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>就业岗位查询</h1>
+  </header>
+
+  <form id="searchForm" class="search-form">
+    <div class="form-row">
+      <div class="form-group city-group">
+        <label for="cityInput">意向城市</label>
+        <div class="city-select-wrapper">
+          <input type="text" id="cityInput"
+                 placeholder="搜索或选择城市..."
+                 autocomplete="off">
+          <input type="hidden" id="city" name="city">
+          <ul class="city-dropdown" id="cityDropdown"></ul>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="keyword">专业方向</label>
+        <input type="text" id="keyword" name="keyword"
+               placeholder="例如：计算机、机械工程、金融..."
+               autocomplete="off">
+      </div>
+
+      <div class="form-group">
+        <label for="subfield">
+          求职方向
+          <span class="label-hint">选填</span>
+        </label>
+        <input type="text" id="subfield" name="subfield"
+               placeholder="例如：嵌入式开发、结构设计..."
+               autocomplete="off">
+      </div>
+
+      <button type="submit" id="searchBtn">
+        <span class="btn-text">搜索</span>
+        <span class="btn-loading" style="display:none">搜索中…</span>
+      </button>
+    </div>
+  </form>
+
+  <div id="stats" class="stats" style="display:none"></div>
+  <div id="results" class="results"></div>
+  <div id="empty" class="empty" style="display:none">
+    <p>未找到相关岗位信息</p>
+    <p>试试更换关键词或城市</p>
+  </div>
+  <div id="error" class="error" style="display:none"></div>
+</div>
+
+<footer>
+  <p>BOSS直聘 · 51job · 智联招聘 · 微信公众号 · 搜索引擎</p>
+</footer>
+
+<!-- City data (all prefecture-level + major cities in China) -->
+<script>
+const CITIES = [
+  "北京","上海","广州","深圳","天津","重庆",
+  "杭州","宁波","温州","嘉兴","湖州","绍兴","金华","衢州","舟山","台州","丽水",
+  "南京","无锡","徐州","常州","苏州","南通","连云港","淮安","盐城","扬州","镇江","泰州","宿迁",
+  "合肥","芜湖","蚌埠","淮南","马鞍山","淮北","铜陵","安庆","黄山","滁州","阜阳","宿州","六安","亳州","池州","宣城",
+  "福州","厦门","莆田","三明","泉州","漳州","南平","龙岩","宁德",
+  "济南","青岛","淄博","枣庄","东营","烟台","潍坊","济宁","泰安","威海","日照","临沂","德州","聊城","滨州","菏泽",
+  "石家庄","唐山","秦皇岛","邯郸","邢台","保定","张家口","承德","沧州","廊坊","衡水",
+  "郑州","开封","洛阳","平顶山","安阳","鹤壁","新乡","焦作","濮阳","许昌","漯河","三门峡","南阳","商丘","信阳","周口","驻马店","济源",
+  "武汉","黄石","十堰","宜昌","襄阳","鄂州","荆门","孝感","荆州","黄冈","咸宁","随州","恩施",
+  "长沙","株洲","湘潭","衡阳","邵阳","岳阳","常德","张家界","益阳","郴州","永州","怀化","娄底","湘西",
+  "成都","绵阳","自贡","攀枝花","泸州","德阳","广元","遂宁","内江","乐山","资阳","宜宾","南充","达州","雅安","广安","巴中","眉山",
+  "南昌","景德镇","萍乡","九江","新余","鹰潭","赣州","吉安","宜春","抚州","上饶",
+  "沈阳","大连","鞍山","抚顺","本溪","丹东","锦州","营口","阜新","辽阳","盘锦","铁岭","朝阳","葫芦岛",
+  "长春","吉林","四平","辽源","通化","白山","松原","白城","延边",
+  "哈尔滨","齐齐哈尔","鸡西","鹤岗","双鸭山","大庆","伊春","佳木斯","七台河","牡丹江","黑河","绥化",
+  "西安","铜川","宝鸡","咸阳","渭南","延安","汉中","榆林","安康","商洛",
+  "太原","大同","阳泉","长治","晋城","朔州","晋中","运城","忻州","临汾","吕梁",
+  "兰州","嘉峪关","金昌","白银","天水","武威","张掖","平凉","酒泉","庆阳","定西","陇南",
+  "昆明","曲靖","玉溪","保山","昭通","丽江","普洱","临沧",
+  "贵阳","六盘水","遵义","安顺","毕节","铜仁","黔西南","黔东南","黔南",
+  "南宁","柳州","桂林","梧州","北海","防城港","钦州","贵港","玉林","百色","贺州","河池","来宾","崇左",
+  "呼和浩特","包头","乌海","赤峰","通辽","鄂尔多斯","呼伦贝尔","巴彦淖尔","乌兰察布",
+  "乌鲁木齐","克拉玛依","吐鲁番","哈密",
+  "西宁","海东",
+  "银川","石嘴山","吴忠","固原","中卫",
+  "拉萨","日喀则","昌都","林芝","山南","那曲",
+  "海口","三亚","三沙","儋州",
+  "中山","东莞","佛山","珠海","汕头","韶关","湛江","肇庆","江门","茂名","惠州","梅州","汕尾","河源","阳江","清远","潮州","揭阳","云浮",
+  "香港","澳门","台北","新北","高雄","台中","台南"
+];
+</script>
+
+<script>
+const form = document.getElementById('searchForm');
+const resultsDiv = document.getElementById('results');
+const statsDiv = document.getElementById('stats');
+const emptyDiv = document.getElementById('empty');
+const errorDiv = document.getElementById('error');
+const searchBtn = document.getElementById('searchBtn');
+const btnText = searchBtn.querySelector('.btn-text');
+const btnLoading = searchBtn.querySelector('.btn-loading');
+const cityInput = document.getElementById('cityInput');
+const cityHidden = document.getElementById('city');
+const cityDropdown = document.getElementById('cityDropdown');
+
+// ── City autocomplete ──
+
+let filteredCities = [];
+let selectedIndex = -1;
+
+// Filter cities based on input value
+function filterCities(val) {
+  if (!val) return CITIES.slice();
+  return CITIES.filter(c => c.includes(val) || c.toUpperCase().includes(val.toUpperCase()));
+}
+
+cityInput.addEventListener('input', () => {
+  const val = cityInput.value.trim();
+  selectedIndex = -1;
+  filteredCities = filterCities(val);
+  if (filteredCities.length === 0) {
+    filteredCities = [val]; // allow custom input
+  }
+  renderDropdown();
+});
+
+cityInput.addEventListener('keydown', (e) => {
+  const isOpen = cityDropdown.style.display === 'block';
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (!isOpen) {
+      // Open dropdown if closed
+      filteredCities = filterCities(cityInput.value.trim());
+      if (filteredCities.length === 0 && cityInput.value.trim()) {
+        filteredCities = [cityInput.value.trim()];
+      }
+      selectedIndex = 0;
+      renderDropdown();
+    } else {
+      selectedIndex = Math.min(selectedIndex + 1, filteredCities.length - 1);
+      renderDropdown();
+    }
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    selectedIndex = Math.max(selectedIndex - 1, -1);
+    renderDropdown();
+  } else if (e.key === 'Enter') {
+    if (isOpen && selectedIndex >= 0 && selectedIndex < filteredCities.length) {
+      e.preventDefault();
+      selectCity(filteredCities[selectedIndex]);
+    } else if (isOpen && filteredCities.length === 1) {
+      e.preventDefault();
+      selectCity(filteredCities[0]);
+    }
+  } else if (e.key === 'Escape') {
+    cityDropdown.style.display = 'none';
+  }
+});
+
+cityInput.addEventListener('blur', () => {
+  setTimeout(() => {
+    cityDropdown.style.display = 'none';
+    // If user typed a custom city, accept it
+    if (!cityHidden.value && cityInput.value.trim()) {
+      cityHidden.value = cityInput.value.trim();
+    }
+  }, 150);
+});
+
+// Show all cities on focus so user can browse
+cityInput.addEventListener('focus', () => {
+  const val = cityInput.value.trim();
+  filteredCities = filterCities(val);
+  if (filteredCities.length === 0 && val) {
+    filteredCities = [val];
+  }
+  selectedIndex = -1;
+  renderDropdown();
+});
+
+function renderDropdown() {
+  cityDropdown.innerHTML = filteredCities.map((c, i) =>
+    `<li class="${i === selectedIndex ? 'active' : ''}" data-city="${escAttr(c)}">${esc(c)}</li>`
+  ).join('');
+  cityDropdown.style.display = 'block';
+  // Re-bind click events
+  cityDropdown.querySelectorAll('li').forEach(li => {
+    li.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      selectCity(li.dataset.city);
+    });
+  });
+}
+
+function selectCity(name) {
+  cityInput.value = name;
+  cityHidden.value = name;
+  cityDropdown.style.display = 'none';
+  filteredCities = [];
+}
+
+// ── Search ──
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const city = cityHidden.value.trim() || cityInput.value.trim();
+  const keyword = document.getElementById('keyword').value.trim();
+  const subfield = document.getElementById('subfield').value.trim();
+
+  if (!city || !keyword) return;
+
+  resultsDiv.innerHTML = '';
+  statsDiv.style.display = 'none';
+  emptyDiv.style.display = 'none';
+  errorDiv.style.display = 'none';
+
+  searchBtn.disabled = true;
+  btnText.style.display = 'none';
+  btnLoading.style.display = 'inline';
+
+  try {
+    const resp = await fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ city, keyword, subfield })
+    });
+
+    const data = await resp.json();
+
+    if (data.error) {
+      showError(data.error);
+      return;
+    }
+
+    if (!data.jobs || data.jobs.length === 0) {
+      emptyDiv.style.display = 'block';
+      return;
+    }
+
+    renderResults(data);
+
+  } catch (err) {
+    showError('请求失败，请检查服务是否已启动');
+  } finally {
+    searchBtn.disabled = false;
+    btnText.style.display = 'inline';
+    btnLoading.style.display = 'none';
+  }
+});
+
+function renderResults(data) {
+  const { jobs, sources, total } = data;
+
+  statsDiv.style.display = 'block';
+  statsDiv.innerHTML = `${total} 条结果`
+    + (sources && sources.length ? ` &nbsp;·&nbsp; ${sources.join(' · ')}` : '');
+
+  resultsDiv.innerHTML = jobs.map(job => `
+    <article class="job-card">
+      <div class="job-header">
+        <h3 class="job-title">
+          <a href="${esc(job.url)}" target="_blank" rel="noopener">${esc(job.title) || '(未知职位)'}</a>
+        </h3>
+        <span class="job-salary">${esc(job.salary) || '薪资面议'}</span>
+      </div>
+      <div class="job-meta">
+        <span>${esc(job.company) || '(未知公司)'}</span>
+        <span>${esc(job.location)}</span>
+        ${job.post_date ? `<span>${esc(job.post_date)}</span>` : ''}
+        <span class="source-tag">${esc(job.source)}</span>
+      </div>
+    </article>
+  `).join('');
+}
+
+function showError(msg) {
+  errorDiv.style.display = 'block';
+  errorDiv.textContent = msg;
+}
+
+function esc(s) {
+  const div = document.createElement('div');
+  div.textContent = s || '';
+  return div.innerHTML;
+}
+
+function escAttr(s) {
+  return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'<').replace(/>/g,'>');
+}
+</script>
+</body>
+</html>
